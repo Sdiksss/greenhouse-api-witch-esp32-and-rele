@@ -1,13 +1,13 @@
 const Umbral = require('../models/Umbral');
 const catchError = require('../utils/catchError');
 
-// Obtener todos los umbrales (útil para frontend)
+// GET - Obtener todos los umbrales
 const getAll = catchError(async (req, res) => {
   const results = await Umbral.findAll();
   return res.json(results);
 });
 
-// Obtener umbral por device_id (lo usa el ESP32)
+// GET - Obtener umbral por device_id
 const getOne = catchError(async (req, res) => {
   const { device_id } = req.params;
   const result = await Umbral.findByPk(device_id);
@@ -15,7 +15,7 @@ const getOne = catchError(async (req, res) => {
   return res.json(result);
 });
 
-// Actualizar umbral existente (NO CREA)
+// UPDATE o CREATE - Usando upsert pero exportado como update
 const update = catchError(async (req, res) => {
   const {
     device_id,
@@ -26,30 +26,22 @@ const update = catchError(async (req, res) => {
     modo
   } = req.body;
 
-  const umbral = await Umbral.findByPk(device_id);
+  const [umbral, created] = await Umbral.upsert({
+    device_id,
+    temp_max,
+    temp_min,
+    humedad_max,
+    humedad_min,
+    modo
+  });
 
-  if (!umbral) {
-    return res.status(404).json({ message: "El umbral no existe, no se puede actualizar" });
-  }
-
-  await umbral.update({
-  temp_max: temp_max ?? umbral.temp_max,
-  temp_min: temp_min ?? umbral.temp_min,
-  humedad_max: humedad_max ?? umbral.humedad_max,
-  humedad_min: humedad_min ?? umbral.humedad_min,
-  modo: modo ?? umbral.modo
-});
-
-
-
-
-  return res.json({
-    message: "Umbral actualizado",
+  return res.status(created ? 201 : 200).json({
+    message: created ? "Umbral creado" : "Umbral actualizado",
     umbral
   });
 });
 
-// Eliminar umbral por device_id (por si necesitas limpiar datos)
+// DELETE - Eliminar umbral
 const remove = catchError(async (req, res) => {
   const { device_id } = req.params;
   await Umbral.destroy({ where: { device_id } });
@@ -59,6 +51,6 @@ const remove = catchError(async (req, res) => {
 module.exports = {
   getAll,
   getOne,
-  update, // Antes era upsert
+  update,  // ✅ Aquí se exporta como update
   remove
 };
